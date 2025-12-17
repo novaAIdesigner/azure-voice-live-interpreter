@@ -1,12 +1,13 @@
 /// <reference types="vite/client" />
 
-import { Buffer } from 'buffer'
-import process from 'process'
+import type { Buffer } from 'buffer'
 
 declare global {
   interface Window {
-    Buffer: typeof Buffer
-    process: typeof process
-    global: typeof globalThis
+    Buffer?: typeof Buffer
+    process?: any
+    global?: typeof globalThis
   }
 }
+
+export {}

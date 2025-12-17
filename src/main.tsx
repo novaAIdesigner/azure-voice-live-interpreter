@@ -1,10 +1,9 @@
 import { Buffer } from 'buffer'
-import process from 'process'
 
-// Polyfills for browser
-window.Buffer = Buffer
-window.process = process
-window.global = window.globalThis
+// Minimal polyfills for browser bundles that expect Node-like globals.
+;(globalThis as any).Buffer ??= Buffer
+;(globalThis as any).process ??= { env: {} }
+;(globalThis as any).global ??= globalThis
 
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
