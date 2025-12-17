@@ -9,6 +9,7 @@ export default defineConfig({
   define: {
     'process.env': {},
     'global': 'globalThis',
+    'Buffer': 'Buffer',
   },
   resolve: {
     alias: {
@@ -17,10 +18,16 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
+    include: ['buffer', 'process'],
     esbuildOptions: {
       define: {
         global: 'globalThis',
       },
+    },
+  },
+  build: {
+    commonjsOptions: {
+      transformMixedEsModules: true,
     },
   },
 })
