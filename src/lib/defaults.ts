@@ -77,7 +77,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   // Comma-separated languages/locales for auto-detection. Example: "en,zh" or "en-US,zh-CN".
   asrLanguages: '',
   voiceProvider: 'azure-standard',
-  voiceName: 'en-US-AriaNeural',
+  voiceName: 'en-US-AvaMultilingualNeural',
   prompt: '',
   // azure-speech transcription requires azure_semantic_vad
   turnDetectionType: 'azure_semantic_vad',

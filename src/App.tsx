@@ -88,6 +88,7 @@ function App() {
   const [isConnected, setIsConnected] = useState(false)
   const [isMicOn, setIsMicOn] = useState(false)
   const [logs, setLogs] = useState<UiLogItem[]>([])
+  const [showInfoLogs, setShowInfoLogs] = useState(false)
 
   const [turns, setTurns] = useState(() => 0)
   const [latTotalMs, setLatTotalMs] = useState(() => 0)
@@ -155,6 +156,11 @@ function App() {
     if (!el) return
     el.scrollTop = el.scrollHeight
   }, [logs.length])
+
+  const visibleLogs = useMemo(() => {
+    if (showInfoLogs) return logs
+    return logs.filter((l) => l.level !== 'info')
+  }, [logs, showInfoLogs])
 
   const calcUrl = useMemo(() => {
     return buildVoiceLiveCalcUrl({
@@ -618,12 +624,22 @@ function App() {
         <section className="panel">
           <div className="panelHeader">
             <h2>Session Window</h2>
-            <button
-              onClick={() => window.open(calcUrl, '_blank', 'noopener,noreferrer')}
-              disabled={turns === 0 && inputAudioSeconds === 0 && inputTextTokens === 0}
-            >
-              Export to VoiceLive Calc
-            </button>
+            <div className="panelHeaderRight">
+              <label className="logToggle" title="Show/hide INFO logs">
+                <input
+                  type="checkbox"
+                  checked={showInfoLogs}
+                  onChange={(e) => setShowInfoLogs(e.target.checked)}
+                />
+                <span>INFO</span>
+              </label>
+              <button
+                onClick={() => window.open(calcUrl, '_blank', 'noopener,noreferrer')}
+                disabled={turns === 0 && inputAudioSeconds === 0 && inputTextTokens === 0}
+              >
+                Export to VoiceLive Calc
+              </button>
+            </div>
           </div>
           <div className="panelScroll">
             <div className="metrics">
@@ -674,7 +690,7 @@ function App() {
             </div>
 
             <div className="log" ref={logViewRef}>
-              {logs.map((l) => (
+              {visibleLogs.map((l) => (
                 <div key={l.id} className={`logRow log-${l.level}`}>
                   <span className="logTs">{new Date(l.ts).toLocaleTimeString()}</span>
                   <span className="logLvl">{l.level.toUpperCase()}</span>

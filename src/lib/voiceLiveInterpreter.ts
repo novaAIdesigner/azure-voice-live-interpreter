@@ -4,6 +4,7 @@ import {
   type VoiceLiveSession,
   type VoiceLiveSubscription,
   type ServerEventResponseTextDelta,
+  type ServerEventResponseTextDone,
   type ServerEventResponseDone,
   type ServerEventResponseCreated,
   type ServerEventResponseAudioDelta,
@@ -18,7 +19,7 @@ import { Pcm16Player } from './audio/pcmPlayer'
 import type { TurnMetrics, Totals } from './metrics'
 import { addUsage, EMPTY_TOTALS } from './metrics'
 
-export type SessionLogLevel = 'info' | 'user' | 'asr' | 'assistant' | 'error'
+export type SessionLogLevel = 'info' | 'user' | 'asr' | 'tts' | 'assistant' | 'error'
 
 export type SessionLogItem = {
   id: string
@@ -42,6 +43,7 @@ export type InterpreterEvents = {
 type TurnState = {
   metrics: TurnMetrics
   textBuffer: string
+  ttsLogged?: boolean
 }
 
 export class VoiceLiveInterpreter {
@@ -109,37 +111,46 @@ export class VoiceLiveInterpreter {
 
     const handlers: VoiceLiveSessionHandlers = {
       onConnected: async (_args, ctx) => {
+        console.log('[VoiceLive Event] onConnected', { args: _args, context: ctx })
         this.log('info', `Connected (sessionId=${ctx.sessionId ?? 'n/a'})`) 
       },
       onDisconnected: async (args) => {
+        console.log('[VoiceLive Event] onDisconnected', args)
         this.log('info', `Disconnected (code=${args.code} reason=${args.reason})`)
       },
       onServerError: async (event: ServerEventError) => {
+        console.log('[VoiceLive Event] onServerError', event)
         this.log('error', `Server error: ${event.error.message}`)
       },
       onConversationItemInputAudioTranscriptionDelta: async (
         event: ServerEventConversationItemInputAudioTranscriptionDelta,
       ) => {
+        console.log('[VoiceLive Event] onConversationItemInputAudioTranscriptionDelta', event)
         if (event.delta) this.log('asr', event.delta)
       },
       onConversationItemInputAudioTranscriptionCompleted: async (
         event: ServerEventConversationItemInputAudioTranscriptionCompleted,
       ) => {
-        this.log('asr', `ASR done: ${event.transcript}`)
+        console.log('[VoiceLive Event] onConversationItemInputAudioTranscriptionCompleted', event)
+        this.log('asr', `🎤 ${event.transcript}`)
       },
       onInputAudioBufferSpeechStarted: async () => {
+        console.log('[VoiceLive Event] onInputAudioBufferSpeechStarted')
         this.log('info', 'Speech detected')
       },
       onInputAudioBufferSpeechStopped: async () => {
+        console.log('[VoiceLive Event] onInputAudioBufferSpeechStopped')
         this.log('info', 'Speech stopped')
       },
       onResponseCreated: async (event: ServerEventResponseCreated) => {
+        console.log('[VoiceLive Event] onResponseCreated', event)
         const responseId = event.response.id ?? `resp_${Date.now()}`
         const metrics: TurnMetrics = { responseId, startedAtMs: Date.now() }
         this.turnMap.set(responseId, { metrics, textBuffer: '' })
         this.log('info', `Response created (${responseId})`)
       },
       onResponseTextDelta: async (event: ServerEventResponseTextDelta) => {
+        console.log('[VoiceLive Event] onResponseTextDelta', event)
         const turn = this.turnMap.get(event.responseId)
         if (!turn) return
 
@@ -152,7 +163,24 @@ export class VoiceLiveInterpreter {
         this.turnMap.set(event.responseId, turn)
         this.events.onState(this.state)
       },
+      onResponseTextDone: async (event: ServerEventResponseTextDone) => {
+        console.log('[VoiceLive Event] onResponseTextDone', event)
+        const responseId = event.responseId
+        const turn = this.turnMap.get(responseId)
+
+        const text = (event.text ?? '').trim()
+        if (!text) return
+
+        if (turn) {
+          turn.textBuffer = text
+          turn.ttsLogged = true
+          this.turnMap.set(responseId, turn)
+        }
+
+        this.log('tts', `🔊 ${text}`)
+      },
       onResponseAudioDelta: async (event: ServerEventResponseAudioDelta) => {
+        console.log('[VoiceLive Event] onResponseAudioDelta', { ...event, delta: event.delta instanceof Uint8Array ? `Uint8Array(${event.delta.length})` : event.delta })
         // Delta is base64 audio; SDK deserializer exposes as Uint8Array in browser builds.
         const chunk = event.delta
         if (chunk instanceof Uint8Array) {
@@ -162,6 +190,7 @@ export class VoiceLiveInterpreter {
         }
       },
       onResponseDone: async (event: ServerEventResponseDone) => {
+        console.log('[VoiceLive Event] onResponseDone', event)
         const responseId = event.response.id ?? 'unknown'
         const turn = this.turnMap.get(responseId)
         const finishedAtMs = Date.now()
@@ -185,7 +214,9 @@ export class VoiceLiveInterpreter {
             'info',
             `Turn latency: ${turn.metrics.latencyMs ?? 0}ms; first-token: ${turn.metrics.firstTokenLatencyMs ?? 0}ms`,
           )
-          this.log('assistant', turn.metrics.assistantText || '(no text)')
+          if (!turn.ttsLogged) {
+            this.log('assistant', `🔊 TTS: ${turn.metrics.assistantText || '(no text)'}`)
+          }
           if (event.response.usage) {
             this.log(
               'info',
@@ -199,6 +230,7 @@ export class VoiceLiveInterpreter {
         this.turnMap.delete(responseId)
       },
       onError: async (args) => {
+        console.log('[VoiceLive Event] onError', args)
         this.log('error', `${args.context}: ${args.error.message}`)
       },
     }
