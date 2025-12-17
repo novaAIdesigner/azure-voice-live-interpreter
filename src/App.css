@@ -13,10 +13,7 @@
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.03);
+  padding: 12px 0;
 }
 
 .title {
@@ -160,6 +157,14 @@ textarea {
   margin: 8px 0 14px;
 }
 
+.startRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 12px 0 16px;
+}
+
 button {
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -168,13 +173,47 @@ button {
 }
 
 .btnStart {
-  background: rgba(46, 204, 113, 0.16);
-  border-color: rgba(46, 204, 113, 0.55);
+  background: #2f6ee6;
+  border-color: #2f6ee6;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.btnStart:hover {
+  background: #255cc9;
+  border-color: #255cc9;
 }
 
 .btnStop {
   background: rgba(255, 107, 107, 0.16);
   border-color: rgba(255, 107, 107, 0.55);
+}
+
+.btnStop:hover {
+  background: rgba(255, 107, 107, 0.25);
+}
+
+.btnBig {
+  padding: 14px 24px;
+  font-size: 16px;
+}
+
+.btnReset {
+  padding: 0;
+  line-height: 1;
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+}
+
+.btnReset:hover {
+  background: rgba(255, 255, 255, 0.15);
 }
 
 .btnInline {

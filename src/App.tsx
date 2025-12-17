@@ -23,6 +23,20 @@ function formatMs(ms: number) {
   return `${(ms / 1000).toFixed(2)}s`
 }
 
+function mapEndpointUrl(url: string): string {
+  try {
+    const pattern = /^(https:\/\/[^/]+)\.services\.ai\.azure\.com\/api\/projects\//
+    const match = url.match(pattern)
+    if (match) {
+      const resourceName = match[1].replace('https://', '')
+      return `https://${resourceName}.cognitiveservices.azure.com/`
+    }
+    return url
+  } catch {
+    return url
+  }
+}
+
 function buildVoiceLiveCalcUrl(args: {
   turns: number
   inputAudioSeconds: number
@@ -186,6 +200,37 @@ function App() {
     }
   }
 
+  async function onResetAll() {
+    const ok = window.confirm('Reset all settings and disconnect? This will reload the page.')
+    if (!ok) return
+
+    setStatusText('Resetting…')
+    try {
+      await stopMic()
+    } catch {
+      // ignore
+    }
+    try {
+      await interpreter.disconnect()
+    } catch {
+      // ignore
+    }
+    try {
+      // Preserve endpoint and API key
+      const preserved = {
+        endpoint: config.endpoint,
+        apiKey: config.apiKey,
+      }
+      localStorage.removeItem('voicelive.config')
+      const resetConfig = { ...DEFAULT_CONFIG, ...preserved }
+      resetConfig.prompt = buildInterpreterPrompt(resetConfig.targetLanguage)
+      localStorage.setItem('voicelive.config', JSON.stringify(resetConfig))
+    } catch {
+      // ignore
+    }
+    window.location.reload()
+  }
+
   async function startMic() {
     if (isMicOn) return
     if (!interpreter.snapshot.isConnected) {
@@ -257,7 +302,7 @@ function App() {
               <span>Endpoint</span>
               <input
                 value={config.endpoint}
-                onChange={(e) => setConfig((c) => ({ ...c, endpoint: e.target.value }))}
+                onChange={(e) => setConfig((c) => ({ ...c, endpoint: mapEndpointUrl(e.target.value) }))}
                 placeholder="https://{your-voicelive-endpoint}"
                 spellCheck={false}
               />
@@ -334,16 +379,25 @@ function App() {
               </label>
             </div>
 
-            <div className="buttons">
+            <div className="startRow">
               {!isConnected ? (
-                <button className="btnStart" onClick={onConnect}>
-                  🟢 Start
+                <button className="btnStart btnBig" onClick={onConnect}>
+                  ▶ Start
                 </button>
               ) : (
-                <button className="btnStop" onClick={onDisconnect}>
-                  ⏹️ Stop
+                <button className="btnStop btnBig" onClick={onDisconnect}>
+                  ⏹ Stop
                 </button>
               )}
+              <button
+                type="button"
+                className="btnReset"
+                onClick={onResetAll}
+                title="Reset all"
+                aria-label="Reset all"
+              >
+                ↻
+              </button>
             </div>
 
             <details className="details">
