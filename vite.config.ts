@@ -6,4 +6,21 @@ export default defineConfig({
   // For GitHub Pages (project site): https://<user>.github.io/<repo>/
   base: process.env.GITHUB_ACTIONS ? '/azure-voice-live-interpreter/' : '/',
   plugins: [react()],
+  define: {
+    'process.env': {},
+    'global': 'globalThis',
+  },
+  resolve: {
+    alias: {
+      'process': 'process/browser',
+      'buffer': 'buffer',
+    },
+  },
+  optimizeDeps: {
+    esbuildOptions: {
+      define: {
+        global: 'globalThis',
+      },
+    },
+  },
 })
