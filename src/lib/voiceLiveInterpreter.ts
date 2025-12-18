@@ -62,6 +62,8 @@ export class VoiceLiveInterpreter {
   private readonly turnMap = new Map<string, TurnState>()
   private readonly pcmPlayer = new Pcm16Player()
   private outputSampleRateHz = 24000
+  private currentSpeechStartMs = 0
+  private currentSpeechStopMs = 0
 
   private readonly events: InterpreterEvents
 
@@ -136,16 +138,23 @@ export class VoiceLiveInterpreter {
       },
       onInputAudioBufferSpeechStarted: async () => {
         console.log('[VoiceLive Event] onInputAudioBufferSpeechStarted')
+        this.currentSpeechStartMs = Date.now()
         this.log('info', 'Speech detected')
       },
       onInputAudioBufferSpeechStopped: async () => {
         console.log('[VoiceLive Event] onInputAudioBufferSpeechStopped')
+        this.currentSpeechStopMs = Date.now()
         this.log('info', 'Speech stopped')
       },
       onResponseCreated: async (event: ServerEventResponseCreated) => {
         console.log('[VoiceLive Event] onResponseCreated', event)
         const responseId = event.response.id ?? `resp_${Date.now()}`
-        const metrics: TurnMetrics = { responseId, startedAtMs: Date.now() }
+        const metrics: TurnMetrics = { 
+          responseId, 
+          startedAtMs: Date.now(),
+          speechStartedAtMs: this.currentSpeechStartMs,
+          speechStoppedAtMs: this.currentSpeechStopMs
+        }
         this.turnMap.set(responseId, { metrics, textBuffer: '' })
         this.log('info', `Response created (${responseId})`)
       },
@@ -184,6 +193,25 @@ export class VoiceLiveInterpreter {
         // Delta is base64 audio; SDK deserializer exposes as Uint8Array in browser builds.
         const chunk = event.delta
         if (chunk instanceof Uint8Array) {
+          // Track first audio delta timing for latency calculation
+          const turn = this.turnMap.get(event.responseId)
+          if (turn && !turn.metrics.firstAudioDeltaAtMs) {
+            const now = Date.now()
+            turn.metrics.firstAudioDeltaAtMs = now
+            
+            // Calculate start latency (speech start -> first audio)
+            if (turn.metrics.speechStartedAtMs) {
+              turn.metrics.startLatencyMs = now - turn.metrics.speechStartedAtMs
+            }
+            
+            // Calculate end latency (speech stopped -> first audio)
+            if (turn.metrics.speechStoppedAtMs) {
+              turn.metrics.endLatencyMs = now - turn.metrics.speechStoppedAtMs
+            }
+            
+            this.turnMap.set(event.responseId, turn)
+          }
+          
           this.pcmPlayer.enqueuePcm16(chunk, this.outputSampleRateHz)
           const seconds = chunk.byteLength / 2 / this.outputSampleRateHz
           this.setState({ totals: { ...this.state.totals, outputAudioSeconds: this.state.totals.outputAudioSeconds + seconds } })
@@ -204,9 +232,21 @@ export class VoiceLiveInterpreter {
           const nextTurns = [...this.state.turns, turn.metrics]
           let nextTotals = { ...this.state.totals }
           nextTotals.turns = nextTotals.turns + 1
-          nextTotals.totalLatencyMs += turn.metrics.latencyMs ?? 0
-          nextTotals.totalFirstTokenLatencyMs += turn.metrics.firstTokenLatencyMs ?? 0
-          if (event.response.usage) nextTotals = addUsage(nextTotals, event.response.usage)
+          
+          // Add latency metrics
+          if (turn.metrics.startLatencyMs) {
+            nextTotals.startLatencies = [...nextTotals.startLatencies, turn.metrics.startLatencyMs]
+          }
+          if (turn.metrics.endLatencyMs) {
+            nextTotals.endLatencies = [...nextTotals.endLatencies, turn.metrics.endLatencyMs]
+          }
+          
+          // Add token usage
+          if (event.response.usage) {
+            nextTotals = addUsage(nextTotals, event.response.usage)
+            // Calculate cached audio time: cached audio tokens / 10
+            nextTotals.cachedAudioSeconds = nextTotals.cachedAudioTokens / 10
+          }
 
           this.setState({ turns: nextTurns, totals: nextTotals })
 
@@ -240,7 +280,10 @@ export class VoiceLiveInterpreter {
     // Ensure session config (and prompt) is applied even when startSession used a config.
     await this.session.updateSession(sessionConfig)
 
-    this.setState({ isConnected: true })
+    this.setState({ 
+      isConnected: true,
+      totals: { ...this.state.totals, sessionStartMs: Date.now() }
+    })
     this.log('info', `Session configured (model=${config.model})`)
   }
 

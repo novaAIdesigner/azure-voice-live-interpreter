@@ -9,6 +9,7 @@ import {
 } from './lib/defaults'
 import { MicCapture } from './lib/audio/micCapture'
 import { VoiceLiveInterpreter } from './lib/voiceLiveInterpreter'
+import { calculatePercentile, calculateAverage, calculateCost } from './lib/metrics'
 
 type UiLogItem = {
   id: string
@@ -91,19 +92,18 @@ function App() {
   const [showInfoLogs, setShowInfoLogs] = useState(false)
 
   const [turns, setTurns] = useState(() => 0)
-  const [latTotalMs, setLatTotalMs] = useState(() => 0)
-  const [firstTokTotalMs, setFirstTokTotalMs] = useState(() => 0)
-  const [inputTokens, setInputTokens] = useState(() => 0)
-  const [outputTokens, setOutputTokens] = useState(() => 0)
-  const [totalTokens, setTotalTokens] = useState(() => 0)
-  const [inputTextTokens, setInputTextTokens] = useState(() => 0)
-  const [inputAudioTokens, setInputAudioTokens] = useState(() => 0)
-  const [cachedTextTokens, setCachedTextTokens] = useState(() => 0)
-  const [cachedAudioTokens, setCachedAudioTokens] = useState(() => 0)
-  const [outputTextTokens, setOutputTextTokens] = useState(() => 0)
-  const [outputAudioTokens, setOutputAudioTokens] = useState(() => 0)
+  const [sessionStartMs, setSessionStartMs] = useState(() => 0)
   const [inputAudioSeconds, setInputAudioSeconds] = useState(() => 0)
+  const [inputAudioTokens, setInputAudioTokens] = useState(() => 0)
+  const [cachedAudioSeconds, setCachedAudioSeconds] = useState(() => 0)
+  const [cachedAudioTokens, setCachedAudioTokens] = useState(() => 0)
   const [outputAudioSeconds, setOutputAudioSeconds] = useState(() => 0)
+  const [outputAudioTokens, setOutputAudioTokens] = useState(() => 0)
+  const [inputTextTokens, setInputTextTokens] = useState(() => 0)
+  const [cachedTextTokens, setCachedTextTokens] = useState(() => 0)
+  const [outputTextTokens, setOutputTextTokens] = useState(() => 0)
+  const [startLatencies, setStartLatencies] = useState<number[]>(() => [])
+  const [endLatencies, setEndLatencies] = useState<number[]>(() => [])
 
   const interpreterRef = useRef<VoiceLiveInterpreter | null>(null)
   const micRef = useRef<MicCapture | null>(null)
@@ -116,19 +116,18 @@ function App() {
         setIsConnected(s.isConnected)
         setLogs(s.logs)
         setTurns(s.totals.turns)
-        setLatTotalMs(s.totals.totalLatencyMs)
-        setFirstTokTotalMs(s.totals.totalFirstTokenLatencyMs)
-        setInputTokens(s.totals.inputTokens)
-        setOutputTokens(s.totals.outputTokens)
-        setTotalTokens(s.totals.totalTokens)
-        setInputTextTokens(s.totals.inputTextTokens)
-        setInputAudioTokens(s.totals.inputAudioTokens)
-        setCachedTextTokens(s.totals.cachedTextTokens)
-        setCachedAudioTokens(s.totals.cachedAudioTokens)
-        setOutputTextTokens(s.totals.outputTextTokens)
-        setOutputAudioTokens(s.totals.outputAudioTokens)
+        setSessionStartMs(s.totals.sessionStartMs)
         setInputAudioSeconds(s.totals.inputAudioSeconds)
+        setInputAudioTokens(s.totals.inputAudioTokens)
+        setCachedAudioSeconds(s.totals.cachedAudioSeconds)
+        setCachedAudioTokens(s.totals.cachedAudioTokens)
         setOutputAudioSeconds(s.totals.outputAudioSeconds)
+        setOutputAudioTokens(s.totals.outputAudioTokens)
+        setInputTextTokens(s.totals.inputTextTokens)
+        setCachedTextTokens(s.totals.cachedTextTokens)
+        setOutputTextTokens(s.totals.outputTextTokens)
+        setStartLatencies(s.totals.startLatencies)
+        setEndLatencies(s.totals.endLatencies)
       },
     })
   }
@@ -156,6 +155,27 @@ function App() {
     if (!el) return
     el.scrollTop = el.scrollHeight
   }, [logs.length])
+
+  const sessionTimeSeconds = sessionStartMs > 0 ? (Date.now() - sessionStartMs) / 1000 : 0
+  const avgStartLatency = startLatencies.length > 0 ? calculateAverage(startLatencies) : 0
+  const p90StartLatency = startLatencies.length > 0 ? calculatePercentile(startLatencies, 90) : 0
+  const avgEndLatency = endLatencies.length > 0 ? calculateAverage(endLatencies) : 0
+  const totalCost = calculateCost({
+    turns,
+    sessionStartMs,
+    inputAudioSeconds,
+    inputAudioTokens,
+    cachedAudioSeconds,
+    cachedAudioTokens,
+    outputAudioSeconds,
+    outputAudioTokens,
+    inputTextTokens,
+    cachedTextTokens,
+    outputTextTokens,
+    startLatencies,
+    endLatencies,
+  })
+  const costPerSecond = sessionTimeSeconds > 0 ? totalCost / sessionTimeSeconds : 0
 
   const visibleLogs = useMemo(() => {
     if (showInfoLogs) return logs
@@ -270,8 +290,7 @@ function App() {
     setIsMicOn(false)
   }
 
-  const avgLatencyMs = turns > 0 ? latTotalMs / turns : 0
-  const avgFirstTokMs = turns > 0 ? firstTokTotalMs / turns : 0
+  // Removed old avgLatencyMs and avgFirstTokMs computed values - replaced by new latency metrics
 
   const modelOptions = useMemo(() => {
     const tiers: Record<string, string[]> = {}
@@ -623,7 +642,7 @@ function App() {
 
         <section className="panel">
           <div className="panelHeader">
-            <h2>Session Window</h2>
+            <h2>Session</h2>
             <div className="panelHeaderRight">
               <label className="logToggle" title="Show/hide INFO logs">
                 <input
@@ -644,48 +663,52 @@ function App() {
           <div className="panelScroll">
             <div className="metrics">
               <div className="metric">
-                <span>Turns</span>
-                <b>{turns}</b>
+                <span>Turns / Session Time</span>
+                <b>{turns} / {sessionTimeSeconds.toFixed(1)}s</b>
               </div>
               <div className="metric">
-                <span>Avg latency</span>
-                <b>{formatMs(avgLatencyMs)}</b>
+                <span>Total Cost</span>
+                <b>${totalCost.toFixed(4)}</b>
               </div>
               <div className="metric">
-                <span>Avg first-token</span>
-                <b>{formatMs(avgFirstTokMs)}</b>
+                <span>Cost/sec</span>
+                <b>${costPerSecond.toFixed(5)}/s</b>
               </div>
               <div className="metric">
-                <span>Tokens (in/out)</span>
-                <b>
-                  {inputTokens}/{outputTokens}
-                </b>
+                <span>Input Audio Time</span>
+                <b>{inputAudioSeconds.toFixed(1)}s ({inputAudioTokens} tok)</b>
               </div>
               <div className="metric">
-                <span>Total tokens</span>
-                <b>{totalTokens}</b>
+                <span>Cached Audio Time</span>
+                <b>{cachedAudioSeconds.toFixed(1)}s ({cachedAudioTokens} tok)</b>
               </div>
               <div className="metric">
-                <span>Audio (in/out)</span>
-                <b>
-                  {Math.round(inputAudioSeconds)}s/{Math.round(outputAudioSeconds)}s
-                </b>
+                <span>Output Audio Time</span>
+                <b>{outputAudioSeconds.toFixed(1)}s ({outputAudioTokens} tok)</b>
               </div>
               <div className="metric">
-                <span>Text tokens</span>
+                <span>Input Text Tokens</span>
                 <b>{inputTextTokens}</b>
               </div>
               <div className="metric">
-                <span>Cache (text/audio)</span>
-                <b>
-                  {cachedTextTokens}/{cachedAudioTokens}
-                </b>
+                <span>Cached Text Tokens</span>
+                <b>{cachedTextTokens}</b>
               </div>
               <div className="metric">
-                <span>Out tokens (text/audio)</span>
-                <b>
-                  {outputTextTokens}/{outputAudioTokens}
-                </b>
+                <span>Output Text Tokens</span>
+                <b>{outputTextTokens}</b>
+              </div>
+              <div className="metric">
+                <span>Avg Start Latency</span>
+                <b>{formatMs(avgStartLatency)}</b>
+              </div>
+              <div className="metric">
+                <span>P90 Start Latency</span>
+                <b>{formatMs(p90StartLatency)}</b>
+              </div>
+              <div className="metric">
+                <span>Avg End Latency</span>
+                <b>{formatMs(avgEndLatency)}</b>
               </div>
             </div>
 
