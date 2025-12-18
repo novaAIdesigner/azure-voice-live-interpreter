@@ -58,14 +58,18 @@ export const EMPTY_TOTALS: Totals = {
 }
 
 export function addUsage(t: Totals, usage: TokenUsage): Totals {
+  const newInputAudioTokens = t.inputAudioTokens + usage.inputTokenDetails.audioTokens
+  const newOutputAudioTokens = t.outputAudioTokens + usage.outputTokenDetails.audioTokens
   return {
     ...t,
     inputTextTokens: t.inputTextTokens + usage.inputTokenDetails.textTokens,
-    inputAudioTokens: t.inputAudioTokens + usage.inputTokenDetails.audioTokens,
+    inputAudioTokens: newInputAudioTokens,
+    inputAudioSeconds: newInputAudioTokens / 10,
     cachedTextTokens: t.cachedTextTokens + usage.inputTokenDetails.cachedTokensDetails.textTokens,
     cachedAudioTokens: t.cachedAudioTokens + usage.inputTokenDetails.cachedTokensDetails.audioTokens,
     outputTextTokens: t.outputTextTokens + usage.outputTokenDetails.textTokens,
-    outputAudioTokens: t.outputAudioTokens + usage.outputTokenDetails.audioTokens,
+    outputAudioTokens: newOutputAudioTokens,
+    outputAudioSeconds: newOutputAudioTokens / 20,
   }
 }
 

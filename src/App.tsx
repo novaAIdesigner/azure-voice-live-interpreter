@@ -281,8 +281,8 @@ function App() {
     micRef.current = new MicCapture(
       { sampleRate: 16000, bufferSize: 4096 },
       {
-        onChunk: (bytes, seconds) => {
-          void interpreter.sendMicPcmChunk(bytes, seconds)
+        onChunk: (bytes) => {
+          void interpreter.sendMicPcmChunk(bytes)
         },
         onState: (s, detail) => {
           if (s === 'started') setIsMicOn(true)

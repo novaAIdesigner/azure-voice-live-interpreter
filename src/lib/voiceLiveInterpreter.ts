@@ -213,8 +213,7 @@ export class VoiceLiveInterpreter {
           }
           
           this.pcmPlayer.enqueuePcm16(chunk, this.outputSampleRateHz)
-          const seconds = chunk.byteLength / 2 / this.outputSampleRateHz
-          this.setState({ totals: { ...this.state.totals, outputAudioSeconds: this.state.totals.outputAudioSeconds + seconds } })
+          // outputAudioSeconds is now calculated from outputAudioTokens in addUsage()
         }
       },
       onResponseDone: async (event: ServerEventResponseDone) => {
@@ -346,9 +345,9 @@ export class VoiceLiveInterpreter {
     })
   }
 
-  async sendMicPcmChunk(pcm16leBytes: Uint8Array, durationSeconds: number) {
+  async sendMicPcmChunk(pcm16leBytes: Uint8Array) {
     if (!this.session) return
     await this.session.sendAudio(pcm16leBytes)
-    this.setState({ totals: { ...this.state.totals, inputAudioSeconds: this.state.totals.inputAudioSeconds + durationSeconds } })
+    // inputAudioSeconds is now calculated from inputAudioTokens in addUsage()
   }
 }
