@@ -71,7 +71,7 @@ export type AppConfig = {
 export const DEFAULT_CONFIG: AppConfig = {
   endpoint: '',
   apiKey: '',
-  model: 'gpt-5',
+  model: 'gpt-4.1-mini',
   targetLanguage: 'en',
   asrModel: 'azure-speech',
   // Comma-separated languages/locales for auto-detection. Example: "en,zh" or "en-US,zh-CN".
@@ -81,9 +81,9 @@ export const DEFAULT_CONFIG: AppConfig = {
   prompt: '',
   // azure-speech transcription requires azure_semantic_vad
   turnDetectionType: 'azure_semantic_vad',
-  threshold: 0.1,
+  threshold: 0.5,
   prefixPaddingInMs: 300,
-  silenceDurationInMs: 100,
+  silenceDurationInMs: 200,
   speechDurationInMs: 80,
   removeFillerWords: false,
   eouModel: 'semantic_detection_v1',
