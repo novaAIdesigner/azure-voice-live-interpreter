@@ -19,7 +19,7 @@ import { Pcm16Player } from './audio/pcmPlayer'
 import type { TurnMetrics, Totals } from './metrics'
 import { addUsage, EMPTY_TOTALS } from './metrics'
 
-export type SessionLogLevel = 'info' | 'user' | 'asr' | 'tts' | 'assistant' | 'error'
+export type SessionLogLevel = 'info' | 'user' | 'input' | 'output' | 'error'
 
 export type SessionLogItem = {
   id: string
@@ -128,13 +128,13 @@ export class VoiceLiveInterpreter {
         event: ServerEventConversationItemInputAudioTranscriptionDelta,
       ) => {
         console.log('[VoiceLive Event] onConversationItemInputAudioTranscriptionDelta', event)
-        if (event.delta) this.log('asr', event.delta)
+        if (event.delta) this.log('input', event.delta)
       },
       onConversationItemInputAudioTranscriptionCompleted: async (
         event: ServerEventConversationItemInputAudioTranscriptionCompleted,
       ) => {
         console.log('[VoiceLive Event] onConversationItemInputAudioTranscriptionCompleted', event)
-        this.log('asr', `🎤 ${event.transcript}`)
+        this.log('input', `🎤 ${event.transcript}`)
       },
       onInputAudioBufferSpeechStarted: async () => {
         console.log('[VoiceLive Event] onInputAudioBufferSpeechStarted')
@@ -186,7 +186,7 @@ export class VoiceLiveInterpreter {
           this.turnMap.set(responseId, turn)
         }
 
-        this.log('tts', `🔊 ${text}`)
+        this.log('output', `🔊 ${text}`)
       },
       onResponseAudioDelta: async (event: ServerEventResponseAudioDelta) => {
         console.log('[VoiceLive Event] onResponseAudioDelta', { ...event, delta: event.delta instanceof Uint8Array ? `Uint8Array(${event.delta.length})` : event.delta })
@@ -254,9 +254,22 @@ export class VoiceLiveInterpreter {
             'info',
             `Turn latency: ${turn.metrics.latencyMs ?? 0}ms; first-token: ${turn.metrics.firstTokenLatencyMs ?? 0}ms`,
           )
+          
+          // Extract TTS text from output content transcript
           if (!turn.ttsLogged) {
-            this.log('assistant', `🔊 TTS: ${turn.metrics.assistantText || '(no text)'}`)
+            let ttsText = '(no text)'
+            if (event.response.output && event.response.output.length > 0) {
+              const outputItem: any = event.response.output[0]
+              if (outputItem?.content && Array.isArray(outputItem.content)) {
+                const textContent = outputItem.content.find((c: any) => c.type === 'audio' && c.transcript)
+                if (textContent?.transcript) {
+                  ttsText = textContent.transcript
+                }
+              }
+            }
+            this.log('output', `🔊 ${ttsText}`)
           }
+          
           if (event.response.usage) {
             this.log(
               'info',

@@ -81,21 +81,119 @@ export function calculateAverage(values: number[]): number {
   return values.reduce((sum, v) => sum + v, 0) / values.length
 }
 
-// Pricing constants (example rates, adjust based on actual pricing)
-const PRICE_PER_1K_INPUT_TEXT_TOKENS = 0.005
-const PRICE_PER_1K_CACHED_TEXT_TOKENS = 0.0025
-const PRICE_PER_1K_OUTPUT_TEXT_TOKENS = 0.015
-const PRICE_PER_SECOND_INPUT_AUDIO = 0.01
-const PRICE_PER_SECOND_CACHED_AUDIO = 0.005
-const PRICE_PER_SECOND_OUTPUT_AUDIO = 0.02
+// Voice Live pricing per million tokens (convert to per 1K by dividing by 1000)
+type VoiceLiveTier = 'pro' | 'standard' | 'lite'
+type VoiceType = 'text' | 'azure-standard' | 'native-audio'
 
-export function calculateCost(totals: Totals): number {
-  const inputTextCost = (totals.inputTextTokens / 1000) * PRICE_PER_1K_INPUT_TEXT_TOKENS
-  const cachedTextCost = (totals.cachedTextTokens / 1000) * PRICE_PER_1K_CACHED_TEXT_TOKENS
-  const outputTextCost = (totals.outputTextTokens / 1000) * PRICE_PER_1K_OUTPUT_TEXT_TOKENS
-  const inputAudioCost = totals.inputAudioSeconds * PRICE_PER_SECOND_INPUT_AUDIO
-  const cachedAudioCost = totals.cachedAudioSeconds * PRICE_PER_SECOND_CACHED_AUDIO
-  const outputAudioCost = totals.outputAudioSeconds * PRICE_PER_SECOND_OUTPUT_AUDIO
+interface PricingRates {
+  inputText: number // per 1M tokens
+  cachedText: number // per 1M tokens
+  outputText: number // per 1M tokens
+  inputAudio: number // per 1M tokens
+  cachedAudio: number // per 1M tokens
+  outputAudio: number // per 1M tokens
+}
+
+const PRICING_TABLE: Record<VoiceLiveTier, Record<VoiceType, PricingRates>> = {
+  pro: {
+    text: {
+      inputText: 5.50,
+      cachedText: 2.75,
+      outputText: 22,
+      inputAudio: 17,
+      cachedAudio: 2.75,
+      outputAudio: 38,
+    },
+    'azure-standard': {
+      inputText: 5.50,
+      cachedText: 2.75,
+      outputText: 22,
+      inputAudio: 17,
+      cachedAudio: 2.75,
+      outputAudio: 38,
+    },
+    'native-audio': {
+      inputText: 5.50,
+      cachedText: 2.75,
+      outputText: 22,
+      inputAudio: 44,
+      cachedAudio: 2.75,
+      outputAudio: 88,
+    },
+  },
+  standard: {
+    text: {
+      inputText: 0.66,
+      cachedText: 0.33,
+      outputText: 2.64,
+      inputAudio: 15,
+      cachedAudio: 0.33,
+      outputAudio: 33,
+    },
+    'azure-standard': {
+      inputText: 0.66,
+      cachedText: 0.33,
+      outputText: 2.64,
+      inputAudio: 15,
+      cachedAudio: 0.33,
+      outputAudio: 33,
+    },
+    'native-audio': {
+      inputText: 0.66,
+      cachedText: 0.33,
+      outputText: 2.64,
+      inputAudio: 11,
+      cachedAudio: 0.33,
+      outputAudio: 22,
+    },
+  },
+  lite: {
+    text: {
+      inputText: 0.11,
+      cachedText: 0.04,
+      outputText: 0.44,
+      inputAudio: 15,
+      cachedAudio: 0.04,
+      outputAudio: 33,
+    },
+    'azure-standard': {
+      inputText: 0.11,
+      cachedText: 0.04,
+      outputText: 0.44,
+      inputAudio: 15,
+      cachedAudio: 0.04,
+      outputAudio: 33,
+    },
+    'native-audio': {
+      inputText: 0.11,
+      cachedText: 0.04,
+      outputText: 0.44,
+      inputAudio: 4,
+      cachedAudio: 0.04,
+      outputAudio: 8,
+    },
+  },
+}
+
+export function calculateCost(
+  totals: Totals,
+  modelTier: VoiceLiveTier = 'standard',
+  voiceProvider: 'openai' | 'azure-standard' = 'azure-standard'
+): number {
+  // Map voice provider to pricing voice type
+  const voiceType: VoiceType = voiceProvider === 'openai' ? 'native-audio' : 'azure-standard'
+  
+  const rates = PRICING_TABLE[modelTier][voiceType]
+  
+  // Convert tokens to cost (rates are per 1M tokens)
+  const inputTextCost = (totals.inputTextTokens / 1_000_000) * rates.inputText
+  const cachedTextCost = (totals.cachedTextTokens / 1_000_000) * rates.cachedText
+  const outputTextCost = (totals.outputTextTokens / 1_000_000) * rates.outputText
+  
+  // Audio tokens to cost (rates are per 1M tokens)
+  const inputAudioCost = (totals.inputAudioTokens / 1_000_000) * rates.inputAudio
+  const cachedAudioCost = (totals.cachedAudioTokens / 1_000_000) * rates.cachedAudio
+  const outputAudioCost = (totals.outputAudioTokens / 1_000_000) * rates.outputAudio
   
   return inputTextCost + cachedTextCost + outputTextCost + inputAudioCost + cachedAudioCost + outputAudioCost
 }

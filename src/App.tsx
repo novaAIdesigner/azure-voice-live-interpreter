@@ -160,21 +160,35 @@ function App() {
   const avgStartLatency = startLatencies.length > 0 ? calculateAverage(startLatencies) : 0
   const p90StartLatency = startLatencies.length > 0 ? calculatePercentile(startLatencies, 90) : 0
   const avgEndLatency = endLatencies.length > 0 ? calculateAverage(endLatencies) : 0
-  const totalCost = calculateCost({
-    turns,
-    sessionStartMs,
-    inputAudioSeconds,
-    inputAudioTokens,
-    cachedAudioSeconds,
-    cachedAudioTokens,
-    outputAudioSeconds,
-    outputAudioTokens,
-    inputTextTokens,
-    cachedTextTokens,
-    outputTextTokens,
-    startLatencies,
-    endLatencies,
-  })
+  
+  // Determine model tier from current model (map to pricing tiers)
+  const pricingTier = useMemo(() => {
+    const modelOption = MODEL_OPTIONS.find(m => m.id === config.model)
+    if (!modelOption) return 'standard' as const
+    // Map 'basic' tier to 'standard' for pricing
+    if (modelOption.tier === 'basic') return 'standard' as const
+    return modelOption.tier as 'pro' | 'standard' | 'lite'
+  }, [config.model])
+  
+  const totalCost = calculateCost(
+    {
+      turns,
+      sessionStartMs,
+      inputAudioSeconds,
+      inputAudioTokens,
+      cachedAudioSeconds,
+      cachedAudioTokens,
+      outputAudioSeconds,
+      outputAudioTokens,
+      inputTextTokens,
+      cachedTextTokens,
+      outputTextTokens,
+      startLatencies,
+      endLatencies,
+    },
+    pricingTier,
+    config.voiceProvider
+  )
   const costPerSecond = sessionTimeSeconds > 0 ? totalCost / sessionTimeSeconds : 0
 
   const visibleLogs = useMemo(() => {
@@ -642,16 +656,8 @@ function App() {
 
         <section className="panel">
           <div className="panelHeader">
-            <h2>Session</h2>
+            <h2>Statistics</h2>
             <div className="panelHeaderRight">
-              <label className="logToggle" title="Show/hide INFO logs">
-                <input
-                  type="checkbox"
-                  checked={showInfoLogs}
-                  onChange={(e) => setShowInfoLogs(e.target.checked)}
-                />
-                <span>INFO</span>
-              </label>
               <button
                 onClick={() => window.open(calcUrl, '_blank', 'noopener,noreferrer')}
                 disabled={turns === 0 && inputAudioSeconds === 0 && inputTextTokens === 0}
@@ -662,54 +668,66 @@ function App() {
           </div>
           <div className="panelScroll">
             <div className="metrics">
-              <div className="metric">
-                <span>Turns / Session Time</span>
+              <div className="metric" title="Number of conversation turns and total session duration">
+                <span>Turns / Session Time <span className="infoIcon">ⓘ</span></span>
                 <b>{turns} / {sessionTimeSeconds.toFixed(1)}s</b>
               </div>
-              <div className="metric">
-                <span>Total Cost</span>
+              <div className="metric" title="Total cost calculated based on model tier, voice provider, and token usage">
+                <span>Total Cost <span className="infoIcon">ⓘ</span></span>
                 <b>${totalCost.toFixed(4)}</b>
               </div>
-              <div className="metric">
-                <span>Cost/sec</span>
+              <div className="metric" title="Average cost per second (Total Cost / Session Time)">
+                <span>Cost/sec <span className="infoIcon">ⓘ</span></span>
                 <b>${costPerSecond.toFixed(5)}/s</b>
               </div>
-              <div className="metric">
-                <span>Input Audio Time</span>
+              <div className="metric" title="Total input audio time. Calculated as inputAudioTokens / 10">
+                <span>Input Audio Time <span className="infoIcon">ⓘ</span></span>
                 <b>{inputAudioSeconds.toFixed(1)}s ({inputAudioTokens} tok)</b>
               </div>
-              <div className="metric">
-                <span>Cached Audio Time</span>
+              <div className="metric" title="Cached audio time from prompt caching. Calculated as cachedAudioTokens / 10">
+                <span>Cached Audio Time <span className="infoIcon">ⓘ</span></span>
                 <b>{cachedAudioSeconds.toFixed(1)}s ({cachedAudioTokens} tok)</b>
               </div>
-              <div className="metric">
-                <span>Output Audio Time</span>
+              <div className="metric" title="Total output audio time (TTS). Calculated as outputAudioTokens / 20">
+                <span>Output Audio Time <span className="infoIcon">ⓘ</span></span>
                 <b>{outputAudioSeconds.toFixed(1)}s ({outputAudioTokens} tok)</b>
               </div>
-              <div className="metric">
-                <span>Input Text Tokens</span>
+              <div className="metric" title="Total input text tokens (transcribed speech and system prompts)">
+                <span>Input Text Tokens <span className="infoIcon">ⓘ</span></span>
                 <b>{inputTextTokens}</b>
               </div>
-              <div className="metric">
-                <span>Cached Text Tokens</span>
+              <div className="metric" title="Cached text tokens from prompt caching (reduces cost)">
+                <span>Cached Text Tokens <span className="infoIcon">ⓘ</span></span>
                 <b>{cachedTextTokens}</b>
               </div>
-              <div className="metric">
-                <span>Output Text Tokens</span>
+              <div className="metric" title="Total output text tokens (model responses)">
+                <span>Output Text Tokens <span className="infoIcon">ⓘ</span></span>
                 <b>{outputTextTokens}</b>
               </div>
-              <div className="metric">
-                <span>Avg Start Latency</span>
+              <div className="metric" title="Average time from user speech start to first audio output">
+                <span>Avg Start Latency <span className="infoIcon">ⓘ</span></span>
                 <b>{formatMs(avgStartLatency)}</b>
               </div>
-              <div className="metric">
-                <span>P90 Start Latency</span>
+              <div className="metric" title="90th percentile of start latency (speech start to first audio output)">
+                <span>P90 Start Latency <span className="infoIcon">ⓘ</span></span>
                 <b>{formatMs(p90StartLatency)}</b>
               </div>
-              <div className="metric">
-                <span>Avg End Latency</span>
+              <div className="metric" title="Average time from user speech stop to corresponding audio output">
+                <span>Avg End Latency <span className="infoIcon">ⓘ</span></span>
                 <b>{formatMs(avgEndLatency)}</b>
               </div>
+            </div>
+
+            <div className="logHeader">
+              <h3>Log</h3>
+              <label className="logToggle" title="Show/hide INFO logs">
+                <input
+                  type="checkbox"
+                  checked={showInfoLogs}
+                  onChange={(e) => setShowInfoLogs(e.target.checked)}
+                />
+                <span>INFO</span>
+              </label>
             </div>
 
             <div className="log" ref={logViewRef}>

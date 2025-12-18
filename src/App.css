@@ -271,12 +271,41 @@ button:disabled {
   display: block;
   font-size: 11px;
   opacity: 0.85;
+  position: relative;
+}
+
+.metric .infoIcon {
+  display: inline-block;
+  margin-left: 4px;
+  font-size: 10px;
+  opacity: 0.5;
+  cursor: help;
+  transition: opacity 0.2s;
+}
+
+.metric:hover .infoIcon {
+  opacity: 0.9;
 }
 
 .metric b {
   display: block;
   margin-top: 6px;
   font-size: 14px;
+}
+
+.logHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  padding: 8px 0;
+}
+
+.logHeader h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 0.9;
 }
 
 .log {
@@ -318,7 +347,7 @@ button:disabled {
   color: #ff6b6b;
 }
 
-.log-assistant .logLvl {
+.log-output .logLvl {
   color: #74c0fc;
 }
 
@@ -326,7 +355,7 @@ button:disabled {
   color: #b197fc;
 }
 
-.log-asr .logLvl {
+.log-input .logLvl {
   color: #63e6be;
 }
 
